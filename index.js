@@ -18,7 +18,7 @@ const client = new MongoClient(uri, {
   }
 });
 app.get('/', (req, res) => {
-  res.send('food lovers server is running')
+  res.send('food lover server is running')
 
 })
 
@@ -28,6 +28,13 @@ async function run() {
     const db = client.db('Food_db');
     const foodCollection = db.collection('foods');
     const bidscollection = db.collection('myBids');
+    const userscollection =db.collection('users');
+
+    app.post('users',async(req,res)=>{
+      const newUser =req.body;
+      const result=await userscollection.insertOne(newUser);
+      res.send(result)
+    })
 
     // All data get**
     app.get('/foods', async (req, res) => {
@@ -114,6 +121,30 @@ async function run() {
       res.send(result)
     })
 
+    app.delete('/myBids/:id', async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) }
+      const result = await bidscollection.deleteOne(query);
+      res.send(result)
+    })
+
+    // Edit a bids
+    app.patch('/myBids/:id', async (req, res) => {
+      const id = req.params.id;
+      const updatedbids = req.body;
+      const query = { _id: new ObjectId(id) }
+      const update = {
+        $set: {
+          buyer_name: updatedbids. user_name,
+          bid_price: updatedbids. rating,
+          buyer_email: updatedbids. user_email
+
+        }
+      }
+      const result = await bidscollection.updateOne(query, update)
+      res.send(result)
+
+    })
 
 
     await client.db("admin").command({ ping: 1 });
