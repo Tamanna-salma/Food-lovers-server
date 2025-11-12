@@ -29,7 +29,8 @@ async function run() {
     const foodCollection = db.collection('foods');
     const bidscollection = db.collection('myBids');
     const userscollection = db.collection('users');
-    const recipecollection=db.collection('recipe');
+    const recipecollection = db.collection('recipe');
+    const favortiesCollection = db.collection('favourites')
 
     //  Users APi**
     app.post('/users', async (req, res) => {
@@ -61,12 +62,20 @@ async function run() {
 
     // All food data get**
     app.get('/foods', async (req, res) => {
-      const email = req.query.email;
-      const query = {}
-      if (email) {
-        query.email = email;
+      // const email = req.query.email;
+      // const query = {}
+      // if (email) {
+      //   query.email = email;
+      // }
+      const { food_name } = req.query
+      let query = {}
+      if (food_name) {
+        query.food_name = {
+          $regex: food_name,
+          $options: 'i'
+        };
       }
-      const cursor = foodCollection.find(query)
+      const cursor = foodCollection.find(query).sort({ created_at: -1 })
       const result = await cursor.toArray();
       res.send(result)
     });
@@ -83,10 +92,38 @@ async function run() {
     // data post**
 
     app.post('/foods', async (req, res) => {
-      const newFood = req.body;
+      const newFoodData = req.body;
+      const { food_name,
+        photo,
+        restaurant_name,
+        restaurant_location,
+        rating,
+        review,
+        email,
+        reviewer_name
+      } = newFoodData
+      const created_at = new Date()
+      const newFood = {
+        food_name,
+        photo,
+        restaurant_name,
+        restaurant_location,
+        rating,
+        review,
+        email,
+        reviewer_name,
+        created_at
+      }
       const result = await foodCollection.insertOne(newFood);
       res.send(result);
     });
+
+    app.post('favorites', async (req, res) => {
+      const favourite = req.body;  
+      const result = await favortiesCollection.insertOne(favourite); 
+      res.send(result);
+    })
+
 
     // edit data**
     app.patch('/foods/:id', async (req, res) => {
