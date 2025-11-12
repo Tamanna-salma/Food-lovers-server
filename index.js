@@ -28,23 +28,45 @@ async function run() {
     const db = client.db('Food_db');
     const foodCollection = db.collection('foods');
     const bidscollection = db.collection('myBids');
-    const userscollection =db.collection('users');
+    const userscollection = db.collection('users');
+    const recipecollection=db.collection('recipe');
 
-    app.post('users',async(req,res)=>{
-      const newUser =req.body;
-      const result=await userscollection.insertOne(newUser);
-      res.send(result)
+    //  Users APi**
+    app.post('/users', async (req, res) => {
+      const newUser = req.body;
+      const email = req.body.email;
+      const query = { email: email }
+      const existinguser = await userscollection.findOne(query);
+      if (existinguser) {
+        res.send({ massage: 'user already exits.' })
+      }
+      else {
+        const result = await userscollection.insertOne(newUser);
+        res.send(result);
+      }
+
     })
 
-    // All data get**
+    app.get('/recentFood', async (req, res) => {
+      const cursor = foodCollection.find().sort({ rating: -1 }).limit(6)
+      const result = await cursor.toArray();
+      res.send(result);
+    })
+
+    app.get('/recipe', async (req, res) => {
+      const cursor = recipecollection.find()
+      const result = await cursor.toArray();
+      res.send(result);
+    })
+
+    // All food data get**
     app.get('/foods', async (req, res) => {
-      // const cursor = foodCollection.find().sort({ rating: -1 }).limit(6)
       const email = req.query.email;
       const query = {}
       if (email) {
         query.email = email;
       }
-      const cursor = foodCollection.find(query).sort({ rating: -1 }).limit(6)
+      const cursor = foodCollection.find(query)
       const result = await cursor.toArray();
       res.send(result)
     });
@@ -135,9 +157,9 @@ async function run() {
       const query = { _id: new ObjectId(id) }
       const update = {
         $set: {
-          buyer_name: updatedbids. user_name,
-          bid_price: updatedbids. rating,
-          buyer_email: updatedbids. user_email
+          buyer_name: updatedbids.user_name,
+          bid_price: updatedbids.rating,
+          buyer_email: updatedbids.user_email
 
         }
       }
