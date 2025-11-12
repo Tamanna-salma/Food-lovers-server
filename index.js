@@ -62,11 +62,6 @@ async function run() {
 
     // All food data get**
     app.get('/foods', async (req, res) => {
-      // const email = req.query.email;
-      // const query = {}
-      // if (email) {
-      //   query.email = email;
-      // }
       const { food_name } = req.query
       let query = {}
       if (food_name) {
@@ -93,14 +88,14 @@ async function run() {
 
     app.post('/foods', async (req, res) => {
       const newFoodData = req.body;
-      const { food_name,
-        photo,
+      const { food_name, photo,
         restaurant_name,
         restaurant_location,
         rating,
         review,
         email,
         reviewer_name
+       
       } = newFoodData
       const created_at = new Date()
       const newFood = {
@@ -118,32 +113,32 @@ async function run() {
       res.send(result);
     });
 
-    app.post('favorites', async (req, res) => {
-      const favourite = req.body;  
-      const result = await favortiesCollection.insertOne(favourite); 
-      res.send(result);
-    })
-
-
     // edit data**
     app.patch('/foods/:id', async (req, res) => {
-      const id = req.params.id;
-      // console.log(id);
-      const updatedFood = req.body;
-      // console.log(updatedFood);
-      const query = { _id: new ObjectId(id) }
-      const update = {
-        // $set:updatedFood
-        $set: {
-          name: updatedFood.name
+  try {
+    const id = req.params.id;
+    const updatedFood = req.body; 
 
-        }
-      }
-      const result = await foodCollection.updateOne(query, update)
-      res.send(result)
+    const query = { _id: new ObjectId(id) };
 
-    });
+    const update = {
+      $set: {
+        ...(updatedFood.food_name && { food_name: updatedFood.food_name }),
+        ...(updatedFood.restaurant_name && { restaurant_name: updatedFood.restaurant_name }),
+        ...(updatedFood.restaurant_location && { restaurant_location: updatedFood.restaurant_location }),
+        ...(updatedFood.rating && { rating: updatedFood.rating }),
+        ...(updatedFood.review && { review: updatedFood.review }),
+        updated_at: new Date(),
+      },
+    };
 
+    const result = await foodCollection.updateOne(query, update);
+    res.send(result);
+  } catch (error) {
+    console.error('Error updating food:', error);
+    res.status(500).send({ error: 'Failed to update food' });
+  }
+});
 
     app.delete('/foods/:id', async (req, res) => {
       const id = req.params.id;
@@ -152,59 +147,14 @@ async function run() {
       res.send(result)
     })
 
-    // bids related Apis
-    app.get('/myBids', async (req, res) => {
-      const email = req.query.email;
-      const query = {};
-      if (email) {
-        query.
-          user_email = email;
-      }
-      const cursor = bidscollection.find(query);
-      const result = await cursor.toArray();
-      res.send(result)
+app.post('favorites', async (req, res) => {
+      const favourite = req.body;  
+      const result = await favortiesCollection.insertOne(favourite); 
+      res.send(result);
     })
 
-    //  get a single bids data
 
-    app.get('/myBids/:id', async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) }
-      const result = await bidscollection.findOne(query)
-      res.send(result)
-    })
-
-    app.post('/myBids', async (req, res) => {
-      const newbid = req.body;
-      const result = await bidscollection.insertOne(newbid);
-      res.send(result)
-    })
-
-    app.delete('/myBids/:id', async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) }
-      const result = await bidscollection.deleteOne(query);
-      res.send(result)
-    })
-
-    // Edit a bids
-    app.patch('/myBids/:id', async (req, res) => {
-      const id = req.params.id;
-      const updatedbids = req.body;
-      const query = { _id: new ObjectId(id) }
-      const update = {
-        $set: {
-          buyer_name: updatedbids.user_name,
-          bid_price: updatedbids.rating,
-          buyer_email: updatedbids.user_email
-
-        }
-      }
-      const result = await bidscollection.updateOne(query, update)
-      res.send(result)
-
-    })
-
+   
 
     await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
