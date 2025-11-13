@@ -151,26 +151,43 @@ async function run() {
 
 app.post('/favourites', async (req, res) => {
   const favourite = req.body;  
-  const result = await favouritesCollection.insertOne(favourite); 
+  const result = await favortiesCollection.insertOne(favourite); 
   res.send(result);
 })
 
 app.delete('/favourites/:id', async (req, res) => {
   const id = req.params.id;
   const query = { _id: new ObjectId(id) }
-  const result = await favouritesCollection.deleteOne(query);
+  const result = await favortiesCollection.deleteOne(query);
   res.send(result)
 })
 
 app.get('/favourites', async (req, res) => {
   const email = req.query.email;
   const query = email ? { userEmail: email } : {};
-  const cursor = favouritesCollection.find(query);
+  const cursor = favortiesCollection.find(query);
   const result = await cursor.toArray();
   res.send(result);
 });
 
-   
+   app.patch('/favourites/:id', async (req, res) => {
+  const id = req.params.id;
+  const updatedFavourite = req.body;
+
+  const query = { _id: new ObjectId(id) };
+  const updateDoc = {
+    $set: {
+      food_name: updatedFavourite.food_name,
+      note: updatedFavourite.note,
+      rating: updatedFavourite.rating,
+      updated_at: new Date()
+    }
+  };
+
+  const result = await favouritesCollection.updateOne(query, updateDoc);
+  res.send(result);
+});
+
     await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
   }
