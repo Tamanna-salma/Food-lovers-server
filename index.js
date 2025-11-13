@@ -21,13 +21,12 @@ app.get('/', (req, res) => {
   res.send('food lover server is running')
 
 })
-
+let favouritesCollection
 async function run() {
   try {
     await client.connect();
     const db = client.db('Food_db');
     const foodCollection = db.collection('foods');
-    const bidscollection = db.collection('myBids');
     const userscollection = db.collection('users');
     const recipecollection = db.collection('recipe');
     const favortiesCollection = db.collection('favourites')
@@ -48,6 +47,7 @@ async function run() {
 
     })
 
+// food**
     app.get('/recentFood', async (req, res) => {
       const cursor = foodCollection.find().sort({ rating: -1 }).limit(6)
       const result = await cursor.toArray();
@@ -147,15 +147,30 @@ async function run() {
       res.send(result)
     })
 
-app.post('favorites', async (req, res) => {
-      const favourite = req.body;  
-      const result = await favortiesCollection.insertOne(favourite); 
-      res.send(result);
-    })
+    // favourite**
 
+app.post('/favourites', async (req, res) => {
+  const favourite = req.body;  
+  const result = await favouritesCollection.insertOne(favourite); 
+  res.send(result);
+})
+
+app.delete('/favourites/:id', async (req, res) => {
+  const id = req.params.id;
+  const query = { _id: new ObjectId(id) }
+  const result = await favouritesCollection.deleteOne(query);
+  res.send(result)
+})
+
+app.get('/favourites', async (req, res) => {
+  const email = req.query.email;
+  const query = email ? { userEmail: email } : {};
+  const cursor = favouritesCollection.find(query);
+  const result = await cursor.toArray();
+  res.send(result);
+});
 
    
-
     await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
   }
@@ -163,7 +178,7 @@ app.post('favorites', async (req, res) => {
 
   }
 
-}
+} 
 run().catch(console.dir)
 
 app.listen(port, () => {
