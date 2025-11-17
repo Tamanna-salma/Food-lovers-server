@@ -7,7 +7,6 @@ const port = process.env.PORT || 3000;
 //moddleware
 app.use(cors());
 app.use(express.json())
-
 const uri = "mongodb+srv://FoodDbUser:UvKhroTORGNUthwq@cluster0.nlnjuiz.mongodb.net/?appName=Cluster0";
 
 const client = new MongoClient(uri, {
@@ -21,7 +20,7 @@ app.get('/', (req, res) => {
   res.send('food lover server is running')
 
 })
-let favouritesCollection
+
 async function run() {
   try {
     await client.connect();
@@ -29,7 +28,7 @@ async function run() {
     const foodCollection = db.collection('foods');
     const userscollection = db.collection('users');
     const recipecollection = db.collection('recipe');
-    const favortiesCollection = db.collection('favourites')
+    const favouritesCollection = db.collection('favourites')
 
     //  Users APi**
     app.post('/users', async (req, res) => {
@@ -151,21 +150,21 @@ async function run() {
 
 app.post('/favourites', async (req, res) => {
   const favourite = req.body;  
-  const result = await favortiesCollection.insertOne(favourite); 
+  const result = await favouritesCollection.insertOne(favourite); 
   res.send(result);
 })
 
 app.delete('/favourites/:id', async (req, res) => {
   const id = req.params.id;
   const query = { _id: new ObjectId(id) }
-  const result = await favortiesCollection.deleteOne(query);
+  const result = await favouritesCollection.deleteOne(query);
   res.send(result)
 })
 
 app.get('/favourites', async (req, res) => {
   const email = req.query.email;
-  const query = email ? { userEmail: email } : {};
-  const cursor = favortiesCollection.find(query);
+  const query = email ? { email: email } : {};
+  const cursor = favouritesCollection.find(query);
   const result = await cursor.toArray();
   res.send(result);
 });
@@ -175,16 +174,17 @@ app.get('/favourites', async (req, res) => {
   const updatedFavourite = req.body;
 
   const query = { _id: new ObjectId(id) };
-  const updateDoc = {
+  const updatefav = {
     $set: {
       food_name: updatedFavourite.food_name,
-      note: updatedFavourite.note,
+      restaurant_name: updatedFavourite.restaurant_name,
+      photo: updatedFavourite.photo,
       rating: updatedFavourite.rating,
       updated_at: new Date()
     }
   };
 
-  const result = await favouritesCollection.updateOne(query, updateDoc);
+  const result = await favouritesCollection.updateOne(query, updatefav);
   res.send(result);
 });
 
@@ -200,4 +200,4 @@ run().catch(console.dir)
 
 app.listen(port, () => {
   console.log(`food lovers server is running on port ${port}`);
-})
+})  
