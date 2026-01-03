@@ -1,14 +1,14 @@
 require('dotenv').config()
 const express = require('express');
 const cors = require('cors');
-
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+
 const app = express();
 const port = process.env.PORT || 3000;
 
-//moddleware
+// Middleware
 app.use(cors());
-app.use(express.json())
+app.use(express.json());
 
 const uri = `mongodb+srv://${process.env.DB_user}:${process.env.DB_pass}@cluster0.nlnjuiz.mongodb.net/?appName=Cluster0`;
 
@@ -19,188 +19,174 @@ const client = new MongoClient(uri, {
     deprecationErrors: true,
   }
 });
-app.get('/', (req, res) => {
-  res.send('food lover server is running')
-
-})
 
 async function run() {
   try {
-    // await client.connect();
+    // Database and Collections
     const db = client.db('Food_db');
     const foodCollection = db.collection('foods');
     const userscollection = db.collection('users');
     const recipecollection = db.collection('recipe');
-    const favouritesCollection = db.collection('favourites')
+    const favouritesCollection = db.collection('favourites');
+    const followCollection = db.collection("follows");
 
-    //  Users APi**
+    // --- Users API ---
     app.post('/users', async (req, res) => {
       const newUser = req.body;
-      const email = req.body.email;
-      const query = { email: email }
+      const query = { email: newUser.email };
       const existinguser = await userscollection.findOne(query);
       if (existinguser) {
-        res.send({ massage: 'user already exits.' })
+        return res.send({ message: 'user already exists.' });
       }
-      else {
-        const result = await userscollection.insertOne(newUser);
-        res.send(result);
-      }
-
-    })
-
-// food**
-    app.get('/recentFood', async (req, res) => {
-      const cursor = foodCollection.find().sort({ rating: -1 }).limit(6)
-      const result = await cursor.toArray();
+      const result = await userscollection.insertOne(newUser);
       res.send(result);
-    })
-
-    app.get('/recipe', async (req, res) => {
-      const cursor = recipecollection.find()
-      const result = await cursor.toArray();
-      res.send(result);
-    })
-
-    // All food data get**
-    app.get('/foods', async (req, res) => {
-      const { food_name } = req.query
-      let query = {}
-      if (food_name) {
-        query.food_name = {
-          $regex: food_name,
-          $options: 'i'
-        };
-      }
-      const cursor = foodCollection.find(query).sort({ created_at: -1 })
-      const result = await cursor.toArray();
-      res.send(result)
     });
 
-    //  get single data
+    app.get('/users', async (req, res) => {
+      const result = await userscollection.find().toArray();
+      res.send(result);
+    });
+
+    // --- Follow/Unfollow API ---
+    app.post('/users/follow', async (req, res) => {
+      const { followerEmail, followingEmail } = req.body;
+
+      // নিজের ইমেইলকে নিজে ফলো করা আটকানো
+      if (followerEmail === followingEmail) {
+        return res.status(400).send({ message: "You cannot follow yourself" });
+      }
+
+      const query = { followerEmail, followingEmail };
+      const isExists = await followCollection.findOne(query);
+
+      if (isExists) {
+        // অলরেডি থাকলে আনফলো (Delete) করবে
+        await followCollection.deleteOne(query);
+        return res.send({ followed: false });
+      }
+
+      // নতুন ফলো ডাটা তৈরি (Date সহ)
+      const followDoc = {
+        followerEmail,
+        followingEmail,
+        followedAt: new Date()
+      };
+      const result = await followCollection.insertOne(followDoc);
+      res.send({ followed: true, result });
+    });
+
+    // --- My Followers List API (আমাকে কারা ফলো করে) ---
+    app.get('/my-followers/:email', async (req, res) => {
+      const email = req.params.email;
+      try {
+        // ১. ফলো কালেকশন থেকে ঐ ইমেইলের ফলোয়ারদের ইমেইল খুঁজুন
+        const followers = await followCollection.find({ followingEmail: email }).toArray();
+        
+        if (followers.length === 0) {
+          return res.send([]); 
+        }
+
+        // ২. ফলোয়ারদের ইমেইলগুলো দিয়ে ইউজার কালেকশন থেকে তাদের প্রোফাইল আনুন
+        const followerEmails = followers.map(f => f.followerEmail);
+        const result = await userscollection.find({ email: { $in: followerEmails } }).toArray();
+        
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({ message: "Error fetching followers" });
+      }
+    });
+
+    // --- Food API ---
+    app.get('/recentFood', async (req, res) => {
+      const cursor = foodCollection.find().sort({ rating: -1 }).limit(8);
+      const result = await cursor.toArray();
+      res.send(result);
+    });
+
+    app.get('/foods', async (req, res) => {
+      const { food_name } = req.query;
+      let query = {};
+      if (food_name) {
+        query.food_name = { $regex: food_name, $options: 'i' };
+      }
+      const cursor = foodCollection.find(query).sort({ created_at: -1 });
+      const result = await cursor.toArray();
+      res.send(result);
+    });
 
     app.get('/foods/:id', async (req, res) => {
       const id = req.params.id;
-      const query = { _id: new ObjectId(id) }
-      const result = await foodCollection.findOne(query)
-      res.send(result)
-    });
-
-    // data post**
-
-    app.post('/foods', async (req, res) => {
-      const newFoodData = req.body;
-      const { food_name, photo,
-        restaurant_name,
-        restaurant_location,
-        rating,
-        review,
-        email,
-        reviewer_name
-       
-      } = newFoodData
-      const created_at = new Date()
-      const newFood = {
-        food_name,
-        photo,
-        restaurant_name,
-        restaurant_location,
-        rating,
-        review,
-        email,
-        reviewer_name,
-        created_at
-      }
-      const result = await foodCollection.insertOne(newFood);
+      const query = { _id: new ObjectId(id) };
+      const result = await foodCollection.findOne(query);
       res.send(result);
     });
 
-    // edit data**
+    app.post('/foods', async (req, res) => {
+      const newFoodData = req.body;
+      newFoodData.created_at = new Date(); // সময় যোগ করা
+      const result = await foodCollection.insertOne(newFoodData);
+      res.send(result);
+    });
+
     app.patch('/foods/:id', async (req, res) => {
-  try {
-    const id = req.params.id;
-    const updatedFood = req.body; 
-
-    const query = { _id: new ObjectId(id) };
-
-    const update = {
-      $set: {
-        ...(updatedFood.food_name && { food_name: updatedFood.food_name }),
-        ...(updatedFood.restaurant_name && { restaurant_name: updatedFood.restaurant_name }),
-        ...(updatedFood.restaurant_location && { restaurant_location: updatedFood.restaurant_location }),
-        ...(updatedFood.rating && { rating: updatedFood.rating }),
-        ...(updatedFood.review && { review: updatedFood.review }),
-        updated_at: new Date(),
-      },
-    };
-
-    const result = await foodCollection.updateOne(query, update);
-    res.send(result);
-  } catch (error) {
-    console.error('Error updating food:', error);
-    res.status(500).send({ error: 'Failed to update food' });
-  }
-});
+      const id = req.params.id;
+      const updatedFood = req.body;
+      const query = { _id: new ObjectId(id) };
+      const update = {
+        $set: {
+          ...updatedFood,
+          updated_at: new Date()
+        }
+      };
+      const result = await foodCollection.updateOne(query, update);
+      res.send(result);
+    });
 
     app.delete('/foods/:id', async (req, res) => {
       const id = req.params.id;
-      const query = { _id: new ObjectId(id) }
+      const query = { _id: new ObjectId(id) };
       const result = await foodCollection.deleteOne(query);
-      res.send(result)
-    })
+      res.send(result);
+    });
 
-    // favourite**
+    // --- Recipes API ---
+    app.get('/recipe', async (req, res) => {
+      const result = await recipecollection.find().toArray();
+      res.send(result);
+    });
 
-app.post('/favourites', async (req, res) => {
-  const favourite = req.body;  
-  const result = await favouritesCollection.insertOne(favourite); 
-  res.send(result);
-})
+    // --- Favourites API ---
+    app.post('/favourites', async (req, res) => {
+      const favourite = req.body;
+      favourite.added_at = new Date();
+      const result = await favouritesCollection.insertOne(favourite);
+      res.send(result);
+    });
 
-app.delete('/favourites/:id', async (req, res) => {
-  const id = req.params.id;
-  const query = { _id: new ObjectId(id) }
-  const result = await favouritesCollection.deleteOne(query);
-  res.send(result)
-})
+    app.get('/favourites', async (req, res) => {
+      const email = req.query.email;
+      const query = email ? { email: email } : {};
+      const result = await favouritesCollection.find(query).toArray();
+      res.send(result);
+    });
 
-app.get('/favourites', async (req, res) => {
-  const email = req.query.email;
-  const query = email ? { email: email } : {};
-  const cursor = favouritesCollection.find(query);
-  const result = await cursor.toArray();
-  res.send(result);
-});
+    app.delete('/favourites/:id', async (req, res) => {
+      const id = req.params.id;
+      const result = await favouritesCollection.deleteOne({ _id: new ObjectId(id) });
+      res.send(result);
+    });
 
-   app.patch('/favourites/:id', async (req, res) => {
-  const id = req.params.id;
-  const updatedFavourite = req.body;
-
-  const query = { _id: new ObjectId(id) };
-  const updatefav = {
-    $set: {
-      food_name: updatedFavourite.food_name,
-      restaurant_name: updatedFavourite.restaurant_name,
-      photo: updatedFavourite.photo,
-      rating: updatedFavourite.rating,
-      updated_at: new Date()
-    }
-  };
-
-  const result = await favouritesCollection.updateOne(query, updatefav);
-  res.send(result);
-});
-
-    // await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
+  } finally {
+    // await client.close();
   }
-  finally {
+}
+run().catch(console.dir);
 
-  }
-
-} 
-run().catch(console.dir)
+app.get('/', (req, res) => {
+  res.send('food lover server is running');
+});
 
 app.listen(port, () => {
   console.log(`food lovers server is running on port ${port}`);
-})  
+});
