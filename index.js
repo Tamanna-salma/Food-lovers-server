@@ -1,3 +1,4 @@
+
 require('dotenv').config()
 const express = require('express');
 const cors = require('cors');
@@ -7,7 +8,11 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin:["http://localhost:5173"],
+  credentials:true
+
+}));
 app.use(express.json());
 
 const uri = `mongodb+srv://${process.env.DB_user}:${process.env.DB_pass}@cluster0.nlnjuiz.mongodb.net/?appName=Cluster0`;
@@ -51,7 +56,7 @@ async function run() {
     app.post('/users/follow', async (req, res) => {
       const { followerEmail, followingEmail } = req.body;
 
-      // নিজের ইমেইলকে নিজে ফলো করা আটকানো
+     
       if (followerEmail === followingEmail) {
         return res.status(400).send({ message: "You cannot follow yourself" });
       }
@@ -60,12 +65,11 @@ async function run() {
       const isExists = await followCollection.findOne(query);
 
       if (isExists) {
-        // অলরেডি থাকলে আনফলো (Delete) করবে
+     
         await followCollection.deleteOne(query);
         return res.send({ followed: false });
       }
-
-      // নতুন ফলো ডাটা তৈরি (Date সহ)
+ 
       const followDoc = {
         followerEmail,
         followingEmail,
@@ -75,18 +79,17 @@ async function run() {
       res.send({ followed: true, result });
     });
 
-    // --- My Followers List API (আমাকে কারা ফলো করে) ---
+    // --- My Followers List API 
     app.get('/my-followers/:email', async (req, res) => {
       const email = req.params.email;
       try {
-        // ১. ফলো কালেকশন থেকে ঐ ইমেইলের ফলোয়ারদের ইমেইল খুঁজুন
+      
         const followers = await followCollection.find({ followingEmail: email }).toArray();
         
         if (followers.length === 0) {
           return res.send([]); 
         }
 
-        // ২. ফলোয়ারদের ইমেইলগুলো দিয়ে ইউজার কালেকশন থেকে তাদের প্রোফাইল আনুন
         const followerEmails = followers.map(f => f.followerEmail);
         const result = await userscollection.find({ email: { $in: followerEmails } }).toArray();
         
@@ -123,7 +126,7 @@ async function run() {
 
     app.post('/foods', async (req, res) => {
       const newFoodData = req.body;
-      newFoodData.created_at = new Date(); // সময় যোগ করা
+      newFoodData.created_at = new Date(); 
       const result = await foodCollection.insertOne(newFoodData);
       res.send(result);
     });
