@@ -1,4 +1,3 @@
-
 require('dotenv').config()
 const express = require('express');
 const cors = require('cors');
@@ -9,9 +8,8 @@ const port = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors({
-  origin:["http://localhost:5173"],
-  credentials:true
-
+  origin: ["http://localhost:5173", "https://food-network-lover.netlify.app"],
+  credentials: true
 }));
 app.use(express.json());
 
@@ -35,16 +33,56 @@ async function run() {
     const favouritesCollection = db.collection('favourites');
     const followCollection = db.collection("follows");
 
-    // --- Users API ---
+    // --- 1. Dashboard & Admin API ---
+   
+    app.get('/admin-stats', async (req, res) => {
+      const users = await userscollection.estimatedDocumentCount();
+      const foods = await foodCollection.estimatedDocumentCount();
+      const recipes = await recipecollection.estimatedDocumentCount();
+      const follows = await followCollection.estimatedDocumentCount();
+
+      const chartData = await foodCollection.aggregate([
+        {
+          $group: {
+            _id: "$category", 
+            value: { $sum: 1 }
+          }
+        },
+        {
+          $project: {
+            name: "$_id",
+            value: 1,
+            _id: 0
+          }
+        }
+      ]).toArray();
+
+      res.send({ users, foods, recipes, follows, chartData });
+    });
+
+    // --- 2. Users & Admin Verification API ---
     app.post('/users', async (req, res) => {
       const newUser = req.body;
       const query = { email: newUser.email };
       const existinguser = await userscollection.findOne(query);
       if (existinguser) {
-        return res.send({ message: 'user already exists.' });
+        return res.send({ message: 'user already exists.', insertedId: null });
       }
+     
+      if (!newUser.role) newUser.role = 'Foodie';
+      
       const result = await userscollection.insertOne(newUser);
       res.send(result);
+    });
+
+    app.get('/users/admin/:email', async (req, res) => {
+      const email = req.params.email;
+      const user = await userscollection.findOne({ email });
+      let isAdmin = false;
+      if (user) {
+        isAdmin = user?.role === 'admin';
+      }
+      res.send({ isAdmin });
     });
 
     app.get('/users', async (req, res) => {
@@ -52,54 +90,37 @@ async function run() {
       res.send(result);
     });
 
-    // --- Follow/Unfollow API ---
+    // --- 3. Follow/Unfollow API ---
     app.post('/users/follow', async (req, res) => {
       const { followerEmail, followingEmail } = req.body;
-
-     
       if (followerEmail === followingEmail) {
         return res.status(400).send({ message: "You cannot follow yourself" });
       }
-
       const query = { followerEmail, followingEmail };
       const isExists = await followCollection.findOne(query);
-
       if (isExists) {
-     
         await followCollection.deleteOne(query);
         return res.send({ followed: false });
       }
- 
-      const followDoc = {
-        followerEmail,
-        followingEmail,
-        followedAt: new Date()
-      };
+      const followDoc = { followerEmail, followingEmail, followedAt: new Date() };
       const result = await followCollection.insertOne(followDoc);
       res.send({ followed: true, result });
     });
 
-    // --- My Followers List API 
     app.get('/my-followers/:email', async (req, res) => {
       const email = req.params.email;
       try {
-      
         const followers = await followCollection.find({ followingEmail: email }).toArray();
-        
-        if (followers.length === 0) {
-          return res.send([]); 
-        }
-
+        if (followers.length === 0) return res.send([]);
         const followerEmails = followers.map(f => f.followerEmail);
         const result = await userscollection.find({ email: { $in: followerEmails } }).toArray();
-        
         res.send(result);
       } catch (error) {
         res.status(500).send({ message: "Error fetching followers" });
       }
     });
 
-    // --- Food API ---
+    // --- 4. Food API ---
     app.get('/recentFood', async (req, res) => {
       const cursor = foodCollection.find().sort({ rating: -1 }).limit(8);
       const result = await cursor.toArray();
@@ -135,12 +156,7 @@ async function run() {
       const id = req.params.id;
       const updatedFood = req.body;
       const query = { _id: new ObjectId(id) };
-      const update = {
-        $set: {
-          ...updatedFood,
-          updated_at: new Date()
-        }
-      };
+      const update = { $set: { ...updatedFood, updated_at: new Date() } };
       const result = await foodCollection.updateOne(query, update);
       res.send(result);
     });
@@ -152,13 +168,12 @@ async function run() {
       res.send(result);
     });
 
-    // --- Recipes API ---
+    // --- 5. Recipes & Favourites ---
     app.get('/recipe', async (req, res) => {
       const result = await recipecollection.find().toArray();
       res.send(result);
     });
 
-    // --- Favourites API ---
     app.post('/favourites', async (req, res) => {
       const favourite = req.body;
       favourite.added_at = new Date();
@@ -179,9 +194,9 @@ async function run() {
       res.send(result);
     });
 
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
+    console.log("Database Connected Successfully!");
   } finally {
-    // await client.close();
+    
   }
 }
 run().catch(console.dir);
@@ -191,5 +206,5 @@ app.get('/', (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`food lovers server is running on port ${port}`);
+  console.log(`Server is running on port ${port}`);
 });
